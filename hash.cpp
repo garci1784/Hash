@@ -4,7 +4,9 @@ CS311
 
 Your name: Jorge Ezequiel Garcia Lopez
 Your programmer number: 08
-Any difficulties?: ??????
+Any difficulties?: I was having trouble with my remove function.
+ I was trying to nullify the slot that only had one entry.
+ I mistakenly was nullifying table[index] instead of entry* slot.
 *********************/
 #include <iostream>
 #include <fstream> //##
@@ -15,10 +17,14 @@ using namespace std;
 //unsigned for positive numbers or zero only. long takes up 4 bytes. 0-2^32(4294967295)
 unsigned long hashNum(const string& key);
 
+/**
+ * This class represents an entry of a student object.
+ */
 class entry //this is basically a node
 {
   //What do you do if hashTbl needs to access the private members of entry?
   //If you don't say private or public, it is private by default.
+  friend class hashTbl;
   string ID;
   string name;
   int age;
@@ -37,7 +43,8 @@ public:
 
 class hashTbl
 {
-  //????? table;   //table points to a dynamic array. Each slot points to an entry, which points to the next entry, ...
+    //(entry*)* table
+  entry** table;   // table points to a dynamic array. Each slot points to an entry, which points to the next entry, ...
   int size; //size of the array
 public:
   hashTbl(int size);
@@ -60,8 +67,14 @@ public:
 hashTbl::hashTbl(int s)
 {
   //set private member size
+    size = s;
   //make a dynamic array that has s slots
+   table = new entry*[size];
   //put NULL in each slot of the array. Remember Each slot contains a pointer to an entry.
+    for (int i = 0; i < size; ++i)
+    {
+        table[i] = NULL;
+    }
 }
 
 //destructor
@@ -69,7 +82,22 @@ hashTbl::~hashTbl()
 {
   //you need to destroy everything created using new.
   //destroy all the entries belong to each slot of the table
+  entry* slot;
+  entry* temp;
+  // iterates through each slot in the hashtable
+  for (int i = 0; i < size; i++)
+  {
+    slot = table[i];
+    // cycles through each entry
+    while (slot != NULL)
+    {
+      temp = slot->next;
+      delete slot;
+      slot = temp;
+    }
+  }
   //don't forget to destroy the dynamic array
+  delete[] table;
 }
 
 //insert an entry to the table
@@ -78,42 +106,99 @@ void hashTbl::put(entry* e)
 {
   //This function is like LL::addFront() from CS211
 
-  //string key = use ID for key 
-  //int index = (call hashNum with key) % (table size); 
-  //entry* cur = make cur point to the first entry
+  //string key = use ID for key
+  string key = e->getID();
 
-  //add the entry at the beginning of the list coming out of index	
+  //int index = (call hashNum with key) % (table size);
+  int index = hashNum(key) % this->size;
+
+  //entry* cur = make cur point to the first entry
+  entry* cur = table[index];
+
+  //add the entry at the beginning of the list coming out of index
+  // This means the first element of the array at the given index is now the entry
+  // but it's a linked list, therefore must set next node first
+  e->next = cur;
+  table[index] = e;
 }
 
 //look up key and return the pointer to it. Assume keys are unique.
 entry* hashTbl::get(const string& key) const //## const
 {
   //This function is like LL::search() from CS211
+  int index = hashNum(key) % this->size;
+  //if (the slot is empty )
+  entry* slot = table[index];
 
-  /*
-  if (the slot is empty )
-      throw underflow(key);
-  */
+  if (slot == NULL)
+    throw underflow(key);
 
   //look for key in the linked list. Return the pointer to the entry with key.
+  entry* p = slot;
+  while (p != NULL)
+  {
+    if (p->ID == key)
+      return p;
+    p = p->getNext();
+  }
 
   //After traversed the list, if key wan't found, throw exception just like above where the slot was empty. //##
+  if (p == NULL)
+    throw underflow(key);
+
+  return p;
 }
 
 //remove the entry with key. Assume keys are unique.
 entry hashTbl::remove(const string& key)
 {
   //This function is like LL::remove() from CS211
+  //Don't forget to return the entry found
+  int index = hashNum(key)%size;
 
- //Don't forget to return the entry found
+  entry* slot = table[index];
 
-  /*
- if (the slot is empty)
-   throw underflow(key);
+  // No entry in hashtable Location
+  if(slot == NULL)
+  {
+    throw underflow(key);
+  }
 
- if (//traversed the list, but didn't find key)
-   throw underflow();
-  */
+  entry entryToBeRemoved;
+  entry* previousEntry;
+  // We don't know how many entries are in each slot
+  while(slot != NULL)
+  {
+    // Slot's key is a match
+    if (slot->ID == key)
+    {
+      entryToBeRemoved = *slot;
+      // only one entry
+      if(slot->next == NULL)
+      {
+        // Can't Nullify table[index]
+        //table[index] = NULL;
+        slot= NULL;
+      }
+      else // multiple entries
+      {
+        previousEntry->next = slot->next;
+        slot = NULL; // will delete in destructor
+      }
+      return entryToBeRemoved;
+    }
+    // no matching key found, check next slot
+    previousEntry = slot;
+    slot = slot->getNext();
+  }
+
+  // gets here if no match was found in the list
+  if (slot->ID != key)
+  {
+    throw underflow(key);
+  }
+
+  return entryToBeRemoved;
 }
 
 //well known hash function called djb2
@@ -140,8 +225,10 @@ const int SIZE = 1327; //prime number for a table size  //##   why 1327 ??
 
 int main()
 {
-  //make a hash table object called students with SIZE slots 
+  //make a hash table object called students with SIZE slots
+  hashTbl students(SIZE);
 
+  int i;
 
   //##
   int count[SIZE] = {0}; //set all slots to 0. Used to see count in each index                                                                      
@@ -163,15 +250,15 @@ int main()
     }
 
   //show the statistic about the table
-  //showTable(count, students);
+  showTable(count, students);
 
   //##
   //put entries into the table
-  //students.put(new entry("T1234567891", "Tom", 23, 4.0));
-  //students.put(new entry("F5432112345", "Fred", 45, 3.5));
-  //students.put(new entry("L1357915987", "Linsey", 48, 2.0));
+  students.put(new entry("T1234567891", "Tom", 23, 4.0));
+  students.put(new entry("F5432112345", "Fred", 45, 3.5));
+  students.put(new entry("L1357915987", "Linsey", 48, 2.0));
 
-  //searches and returns students in table without removing                                                                     
+  //searches and returns students in table without removing
   try
     {
       cout << "trying to search" << endl;
@@ -226,7 +313,10 @@ void showTable(const int count[], const hashTbl& students)
       if(count[i] < lowest)
         lowest = count[i];
       if(count[i] > highest)
+      {
         highest = count[i];
+        hi_i = i;
+      }
       if(count[i] == 0)
         empty++;
 
